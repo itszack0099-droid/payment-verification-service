@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build APKs
 
 on:
   push:
@@ -8,8 +8,62 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
-    name: Build Debug APK
+
+  # ──────────────────────────────────────────────
+  # Job 1: Flutter APK
+  # ──────────────────────────────────────────────
+  build-flutter-apk:
+    name: Build Flutter Debug APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.19.6'
+          channel: 'stable'
+          cache: true
+
+      - name: Generate android/ platform folder (no-overwrite)
+        run: |
+          flutter create \
+            --project-name payment_verifier \
+            --org com.paymentverifier \
+            --platforms android \
+            --no-overwrite \
+            .
+
+      - name: Install Flutter dependencies
+        run: flutter pub get
+
+      - name: Analyze Dart code
+        run: flutter analyze --no-fatal-infos
+        continue-on-error: true
+
+      - name: Build Flutter debug APK
+        run: flutter build apk --debug
+
+      - name: Upload Flutter debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: flutter-debug-apk
+          path: build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 14
+
+  # ──────────────────────────────────────────────
+  # Job 2: Kotlin APK
+  # ──────────────────────────────────────────────
+  build-kotlin-apk:
+    name: Build Kotlin Debug APK
     runs-on: ubuntu-latest
 
     steps:
@@ -26,10 +80,6 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Grant execute permission for gradlew
-        working-directory: PaymentVerifier
-        run: chmod +x gradlew
-
       - name: Cache Gradle packages
         uses: actions/cache@v4
         with:
@@ -40,19 +90,16 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
-      - name: Build debug APK
+      - name: Grant gradlew execute permission
+        run: chmod +x PaymentVerifier/gradlew
+
+      - name: Build Kotlin debug APK
         working-directory: PaymentVerifier
         run: ./gradlew assembleDebug --no-daemon --stacktrace
 
-      - name: Upload debug APK
+      - name: Upload Kotlin debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug-apk
+          name: kotlin-debug-apk
           path: PaymentVerifier/app/build/outputs/apk/debug/app-debug.apk
-          retention-days: 7
-
-      - name: Display APK info
-        working-directory: PaymentVerifier
-        run: |
-          echo "APK built successfully:"
-          ls -lh app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 14
