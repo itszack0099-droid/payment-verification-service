@@ -14,30 +14,38 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
 
-    // Delay so UI loads first
-    Future.delayed(const Duration(milliseconds: 500), () {
-      checkPermission();
-    });
+    Future.delayed(
+      const Duration(milliseconds: 500),
+      checkNotificationPermission,
+    );
   }
 
-  Future<void> checkPermission() async {
-    bool enabled = await Permission.notification.isGranted;
+  Future<void> checkNotificationPermission() async {
 
-    if (!enabled) {
+    var status = await Permission.notification.status;
+
+    if (!status.isGranted) {
       showPermissionDialog();
     }
+
   }
 
   void showPermissionDialog() {
+
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) {
+
         return AlertDialog(
-          title: const Text("Notification Permission"),
+          title: const Text(
+            "Notification Permission",
+          ),
+
           content: const Text(
             "Notification permission is required for payment verification.",
           ),
+
           actions: [
 
             TextButton(
@@ -56,23 +64,69 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
 
           ],
+
         );
+
       },
+
     );
+
   }
 
   @override
   Widget build(BuildContext context) {
+
     return Scaffold(
+
       appBar: AppBar(
-        title: const Text("Payment Verification Service"),
-      ),
-      body: const Center(
-        child: Text(
-          "Service Ready",
-          style: TextStyle(fontSize: 18),
+        title: const Text(
+          "Payment Verification Service",
         ),
       ),
+
+      body: Center(
+        child: Column(
+
+          mainAxisAlignment: MainAxisAlignment.center,
+
+          children: [
+
+            const Text(
+              "Service Ready",
+              style: TextStyle(
+                fontSize: 18,
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            ElevatedButton(
+              onPressed: () {
+                print("Create Payment clicked");
+              },
+              child: const Text(
+                "Create Payment",
+              ),
+            ),
+
+            const SizedBox(height: 10),
+
+            ElevatedButton(
+              onPressed: () {
+                print("Verify Payment clicked");
+              },
+              child: const Text(
+                "Verify Payment",
+              ),
+            ),
+
+          ],
+
+        ),
+      ),
+
     );
+
   }
+
 }
