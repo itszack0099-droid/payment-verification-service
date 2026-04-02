@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Payment Verification Service</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: Arial, sans-serif;
+      background: #ffffff;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 20px;
+      color: #222;
+    }
+
+    h1 {
+      font-size: 24px;
+      font-weight: bold;
+      text-align: center;
+      margin-bottom: 8px;
+    }
+
+    .subtitle {
+      font-size: 15px;
+      color: #555;
+      margin-bottom: 32px;
+      text-align: center;
+    }
+
+    .card {
+      width: 100%;
+      max-width: 520px;
+      background: #fff;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+
+    .card h2 {
+      font-size: 16px;
+      font-weight: bold;
+      margin-bottom: 16px;
+      color: #333;
+    }
+
+    label {
+      display: block;
+      font-size: 13px;
+      margin-bottom: 5px;
+      color: #444;
+    }
+
+    select, input[type="text"] {
+      width: 100%;
+      padding: 9px 12px;
+      font-size: 14px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      margin-bottom: 14px;
+      outline: none;
+    }
+
+    select:focus, input[type="text"]:focus {
+      border-color: #007bff;
+    }
+
+    button {
+      width: 100%;
+      padding: 11px;
+      font-size: 14px;
+      font-weight: bold;
+      background: #007bff;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-bottom: 4px;
+      transition: background 0.2s;
+    }
+
+    button:hover { background: #0069d9; }
+    button:disabled { background: #9bb8d8; cursor: not-allowed; }
+
+    .msg {
+      margin-top: 12px;
+      padding: 10px 14px;
+      border-radius: 4px;
+      font-size: 13px;
+      line-height: 1.5;
+      display: none;
+    }
+
+    .msg.visible { display: block; }
+    .msg.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+    .msg.error   { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+    .msg.info    { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+    .msg.warning { background: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
+
+    .meta { font-size: 12px; font-family: monospace; word-break: break-all; margin-top: 6px; }
+
+    .divider { width: 100%; max-width: 520px; border: none; border-top: 1px solid #eee; margin: 4px 0 20px; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    th, td {
+      padding: 8px 10px;
+      border: 1px solid #dee2e6;
+      text-align: left;
+    }
+
+    th { background: #f8f9fa; font-weight: bold; font-size: 12px; }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: bold;
+      text-transform: capitalize;
+    }
+
+    .badge-pending  { background: #fff3cd; color: #856404; }
+    .badge-approved { background: #d4edda; color: #155724; }
+    .badge-expired  { background: #f8d7da; color: #721c24; }
+    .badge-unknown  { background: #e2e3e5; color: #383d41; }
+
+    .empty-note { font-size: 13px; color: #999; text-align: center; padding: 12px 0; }
+
+    .ticker {
+      font-size: 12px;
+      color: #555;
+      text-align: center;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Payment Verification Service</h1>
+  <p class="subtitle">Service Ready</p>
+
+  <div class="card">
+    <h2>Create Payment</h2>
+
+    <label for="currency">Currency</label>
+    <select id="currency">
+      <option value="INR" selected>INR (₹)</option>
+      <option value="USD">USD ($)</option>
+    </select>
+
+    <button id="btnCreate" onclick="createPayment()">Create Payment</button>
+    <div id="createMsg" class="msg"></div>
+    <div id="ticker" class="ticker" style="display:none;"></div>
+  </div>
+
+  <hr class="divider" />
+
+  <div class="card">
+    <h2>Verify Payment</h2>
+
+    <label for="requestIdInput">Request ID</label>
+    <input type="text" id="requestIdInput" placeholder="Enter Request ID to verify" />
+
+    <button id="btnVerify" onclick="verifyPayment()">Verify Payment</button>
+    <div id="verifyMsg" class="msg"></div>
+  </div>
+
+  <hr class="divider" />
+
+  <div class="card">
+    <h2>Recent Verifications</h2>
+    <div id="recentList">
+      <p class="empty-note">No verifications yet.</p>
+    </div>
+  </div>
+
+  <script>
+    const SUPABASE_URL = 'https://siujmsbmvwxxbdhlihgd.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNpdWptc2Jtdnd4eGJkaGxpaGdkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1NDQ2MDksImV4cCI6MjA4OTEyMDYwOX0.WlRm9ySc6huXd7018ESMTtkKS4XLmgBszNO0yvoG2DY';
+
+    let db;
+    try {
+      db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    } catch (e) {
+      showMsg('createMsg', 'error', 'Unable to connect to payment server.');
+    }
+
+    let recentVerifications = [];
+    let autoRefreshInterval = null;
+    let autoRefreshTimeout = null;
+    let tickerInterval = null;
+
+    function getCurrencySymbol() {
+      return document.getElementById('currency').value === 'INR' ? '₹' : '$';
+    }
+
+    function showMsg(id, type, html) {
+      const el = document.getElementById(id);
+      el.className = `msg ${type} visible`;
+      el.innerHTML = html;
+    }
+
+    function hideMsg(id) {
+      const el = document.getElementById(id);
+      el.className = 'msg';
+      el.innerHTML = '';
+    }
+
+    async function createPayment() {
+      if (!db) { showMsg('createMsg', 'error', 'Unable to connect to payment server.'); return; }
+
+      const btn = document.getElementById('btnCreate');
+      btn.disabled = true;
+      btn.textContent = 'Creating...';
+      showMsg('createMsg', 'info', 'Creating payment request...');
+
+      try {
+        const { data, error } = await db.rpc('create_payment_request', {
+          user_id: crypto.randomUUID(),
+          name: 'User',
+          phone: '9999999999',
+          amount: 149
+        });
+
+        if (error) throw error;
+
+        const result = Array.isArray(data) ? data[0] : data;
+        const requestId = result.request_id;
+        const finalAmount = result.final_amount ?? 149;
+        const sym = getCurrencySymbol();
+
+        document.getElementById('requestIdInput').value = requestId;
+
+        showMsg('createMsg', 'success',
+          `Payment request created successfully.<br>` +
+          `<div class="meta"><strong>Request ID:</strong> ${requestId}</div>` +
+          `<div class="meta"><strong>Amount:</strong> ${sym}${finalAmount}</div>`
+        );
+
+        startAutoRefresh(requestId);
+
+      } catch (err) {
+        const msg = err && err.message ? err.message.toLowerCase() : '';
+        if (msg.includes('network') || msg.includes('fetch') || msg.includes('connect')) {
+          showMsg('createMsg', 'error', 'Unable to connect to payment server.');
+        } else {
+          showMsg('createMsg', 'error', 'Payment request failed. Please try again.');
+        }
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Create Payment';
+      }
+    }
+
+    async function verifyPayment(requestIdOverride) {
+      if (!db) { showMsg('verifyMsg', 'error', 'Unable to connect to payment server.'); return; }
+
+      const requestId = requestIdOverride || document.getElementById('requestIdInput').value.trim();
+
+      if (!requestId) {
+        showMsg('verifyMsg', 'error', 'Please enter a Request ID.');
+        return null;
+      }
+
+      const btn = document.getElementById('btnVerify');
+      if (!requestIdOverride) {
+        btn.disabled = true;
+        btn.textContent = 'Verifying...';
+      }
+
+      try {
+        const { data, error } = await db.rpc('check_payment_status', {
+          request_id: requestId
+        });
+
+        if (error) throw error;
+
+        const result  = Array.isArray(data) ? data[0] : data;
+        const status  = (typeof result === 'string' ? result : result.status) || 'unknown';
+        const amount  = result.amount ?? result.final_amount ?? 149;
+        const sym     = getCurrencySymbol();
+
+        if (!requestIdOverride) {
+          if (status === 'approved') {
+            showMsg('verifyMsg', 'success', 'Payment approved. Subscription activated.');
+          } else if (status === 'expired') {
+            showMsg('verifyMsg', 'error', 'Payment expired. Please try again.');
+          } else {
+            showMsg('verifyMsg', 'info', `Status: <strong>${status}</strong>`);
+          }
+        }
+
+        addToRecent({ requestId, amount, status });
+        return status;
+
+      } catch (err) {
+        if (!requestIdOverride) {
+          showMsg('verifyMsg', 'error', 'Unable to connect to payment server.');
+        }
+        return null;
+      } finally {
+        if (!requestIdOverride) {
+          btn.disabled = false;
+          btn.textContent = 'Verify Payment';
+        }
+      }
+    }
+
+    function startAutoRefresh(requestId) {
+      stopAutoRefresh();
+
+      let elapsed = 0;
+      const INTERVAL = 5;
+      const MAX = 120;
+
+      const ticker = document.getElementById('ticker');
+      ticker.style.display = 'block';
+
+      function updateTicker() {
+        const remaining = MAX - elapsed;
+        ticker.textContent = remaining > 0
+          ? `Auto-checking payment status… ${remaining}s remaining`
+          : 'Auto-check complete.';
+      }
+
+      updateTicker();
+
+      autoRefreshInterval = setInterval(async () => {
+        elapsed += INTERVAL;
+        updateTicker();
+
+        const status = await verifyPayment(requestId);
+
+        if (status === 'approved') {
+          showMsg('createMsg', 'success',
+            `Payment approved. Subscription activated.<br>` +
+            `<div class="meta"><strong>Request ID:</strong> ${requestId}</div>`
+          );
+          stopAutoRefresh();
+          return;
+        }
+
+        if (status === 'expired') {
+          showMsg('createMsg', 'error', 'Payment expired. Please try again.');
+          stopAutoRefresh();
+          return;
+        }
+
+        if (elapsed >= MAX) {
+          stopAutoRefresh();
+        }
+      }, INTERVAL * 1000);
+
+      autoRefreshTimeout = setTimeout(() => {
+        stopAutoRefresh();
+      }, MAX * 1000);
+    }
+
+    function stopAutoRefresh() {
+      if (autoRefreshInterval) { clearInterval(autoRefreshInterval); autoRefreshInterval = null; }
+      if (autoRefreshTimeout)  { clearTimeout(autoRefreshTimeout);   autoRefreshTimeout  = null; }
+      const ticker = document.getElementById('ticker');
+      if (ticker) ticker.style.display = 'none';
+    }
+
+    function addToRecent(entry) {
+      const idx = recentVerifications.findIndex(v => v.requestId === entry.requestId);
+      if (idx >= 0) {
+        recentVerifications[idx] = { ...recentVerifications[idx], ...entry, time: new Date() };
+      } else {
+        recentVerifications.unshift({ ...entry, time: new Date() });
+      }
+      recentVerifications = recentVerifications.slice(0, 20);
+      renderRecent();
+    }
+
+    function renderRecent() {
+      const container = document.getElementById('recentList');
+      if (recentVerifications.length === 0) {
+        container.innerHTML = '<p class="empty-note">No verifications yet.</p>';
+        return;
+      }
+      const sym = getCurrencySymbol();
+      const rows = recentVerifications.map(v => {
+        const s = (v.status || 'unknown').toLowerCase();
+        const badgeClass = ['approved','pending','expired'].includes(s) ? `badge badge-${s}` : 'badge badge-unknown';
+        return `<tr>
+          <td style="font-family:monospace;font-size:11px;">${(v.requestId || '').substring(0, 12)}…</td>
+          <td>${sym}${v.amount ?? 149}</td>
+          <td><span class="${badgeClass}">${s}</span></td>
+          <td>${v.time.toLocaleTimeString()}</td>
+        </tr>`;
+      }).join('');
+      container.innerHTML = `
+        <table>
+          <thead>
+            <tr><th>Request ID</th><th>Amount</th><th>Status</th><th>Time</th></tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>`;
+    }
+
+    document.getElementById('currency').addEventListener('change', renderRecent);
+  </script>
+</body>
+</html>
