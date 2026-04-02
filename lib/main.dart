@@ -1,12 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:notification_listener_service/notification_listener_service.dart';
 
 import 'screens/home_screen.dart';
-import 'screens/permission_screen.dart';
 
-const String _supabaseUrl =
-    'https://siujmsbmvwxxbdhlihgd.supabase.co';
+const String _supabaseUrl = 'https://siujmsbmvwxxbdhlihgd.supabase.co';
 const String _supabaseAnonKey =
     'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9'
     '.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNpdWptc2Jtdnd4eGJkaGxpaGdkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1NDQ2MDksImV4cCI6MjA4OTEyMDYwOX0'
@@ -51,51 +48,8 @@ class PaymentVerifierApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const SplashRouter(),
-    );
-  }
-}
-
-/// Checks notification permission and routes to the correct screen.
-/// Shows a loading indicator while checking — never a blank screen.
-class SplashRouter extends StatefulWidget {
-  const SplashRouter({super.key});
-
-  @override
-  State<SplashRouter> createState() => _SplashRouterState();
-}
-
-class _SplashRouterState extends State<SplashRouter> {
-  @override
-  void initState() {
-    super.initState();
-    _checkAndRoute();
-  }
-
-  Future<void> _checkAndRoute() async {
-    bool hasPermission = false;
-    try {
-      hasPermission =
-          await NotificationListenerService.isPermissionGranted();
-    } catch (_) {
-      hasPermission = false;
-    }
-
-    if (!mounted) return;
-
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (_) =>
-            hasPermission ? const HomeScreen() : const PermissionScreen(),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(
-      backgroundColor: Colors.white,
-      body: Center(child: CircularProgressIndicator()),
+      // Always start on HomeScreen — no permission gate at startup.
+      home: const HomeScreen(),
     );
   }
 }
